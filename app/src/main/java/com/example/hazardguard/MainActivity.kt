@@ -702,7 +702,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
         val isHighDanger = currentLevel == "high" && assessment?.alarmSound == true
         val isWarning = currentLevel == "medium" || currentLevel == "warning"
 
-        if (isHighDanger && !isAlarmSilenced) {
+        if (isHighDanger && !isAlarmSilenced && !adultPresent) {
             if (!ringtone.isPlaying) {
                 ringtone.play()
             }
@@ -714,11 +714,11 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             if (ringtone.isPlaying) {
                 ringtone.stop()
             }
-            if (!isHighDanger) {
+            if (!isHighDanger || adultPresent) {
                 isAlarmSilenced = false
                 hasAutoCalled = false
             }
-            if (isWarning && lastAlertLevel != "medium" && lastAlertLevel != "warning") {
+            if (isWarning && lastAlertLevel != "medium" && lastAlertLevel != "warning" && !adultPresent) {
                 triggerWarningAlert(context)
             }
         }
@@ -728,7 +728,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
     var lastCameraBlocked by remember { mutableStateOf(false) }
     LaunchedEffect(cameraActive, isCameraBlocked) {
         val blockedNow = cameraActive && isCameraBlocked
-        if (blockedNow && !lastCameraBlocked) {
+        if (blockedNow && !lastCameraBlocked && !adultPresent) {
             if (!ringtone.isPlaying) {
                 triggerWarningAlert(context)
             }
@@ -739,7 +739,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
 
     var lastChildCry by remember { mutableStateOf(false) }
     LaunchedEffect(isChildCry) {
-        if (isChildCry && !lastChildCry) {
+        if (isChildCry && !lastChildCry && !adultPresent) {
             if (!ringtone.isPlaying) {
                 triggerWarningAlert(context)
             }
@@ -751,7 +751,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
     var lastTiltWarning by remember { mutableStateOf(false) }
     LaunchedEffect(tilt) {
         val isTiltedNow = (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD
-        if (isTiltedNow && !lastTiltWarning) {
+        if (isTiltedNow && !lastTiltWarning && !adultPresent) {
             if (!ringtone.isPlaying) {
                 triggerWarningAlert(context)
             }
@@ -811,8 +811,9 @@ fun SensorScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    val isPhysicalWarning = (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD || isChildCry || (cameraActive && isCameraBlocked)
+    val isPhysicalWarning = !adultPresent && ((tilt ?: 0f) > TILT_TOPPLE_THRESHOLD || isChildCry || (cameraActive && isCameraBlocked))
     val effectiveLevel = when {
+        adultPresent -> "low"
         assessment?.level == "high" -> "high"
         isPhysicalWarning || assessment?.level == "medium" -> "medium"
         else -> assessment?.level ?: "low"
@@ -826,6 +827,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
     }
 
     val effectiveTitle = when {
+        adultPresent -> "✅ ADULT PRESENT — NURSERY SUPERVISED"
         assessment?.level == "high" -> assessment?.alertTitle ?: "🚨 CRITICAL HAZARD"
         (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD -> "⚠️ CAUTION: Stand Toppled (>115°)"
         isChildCry -> "⚠️ CAUTION: Infant Distress Cry"
@@ -835,6 +837,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
     }
 
     val effectivePrediction = when {
+        adultPresent -> "Caregiver is actively present in the nursery. All automated sirens silenced and direct parental supervision confirmed."
         (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD -> "Phone is tilted at %.0f° — nursery stand or cradle has fallen.".format(tilt ?: 0f)
         isChildCry -> "Acute acoustic crying pitch (%.0f Hz) detected in nursery.".format(pitchHz)
         cameraActive && isCameraBlocked -> "Camera lens is covered or dark. Line-of-sight to child is lost."
@@ -843,6 +846,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
     }
 
     val effectiveAction = when {
+        adultPresent -> "Adult on-site. Routine care in progress."
         (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD -> "Reposition phone on stable upright stand."
         isChildCry -> "Check on infant immediately."
         cameraActive && isCameraBlocked -> "Clear obstruction from camera lens."
@@ -885,7 +889,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             )
         }
 
-        val isAlarmActive = ringtone.isPlaying || (assessment?.level == "high" && assessment?.alarmSound == true && !isAlarmSilenced)
+        val isAlarmActive = !adultPresent && (ringtone.isPlaying || (assessment?.level == "high" && assessment?.alarmSound == true && !isAlarmSilenced))
         if (isAlarmActive) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFCDD2)),
@@ -926,7 +930,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        val isWarningActive = !isAlarmActive && (assessment?.level == "medium" || (cameraActive && isCameraBlocked) || isChildCry || (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD)
+        val isWarningActive = !adultPresent && !isAlarmActive && (assessment?.level == "medium" || (cameraActive && isCameraBlocked) || isChildCry || (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD)
         if (isWarningActive) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)),
@@ -1126,8 +1130,25 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Adult Present in Nursery", style = MaterialTheme.typography.bodyMedium)
-                        Switch(checked = adultPresent, onCheckedChange = { adultPresent = it })
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Adult Present in Nursery", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (adultPresent) "Caregiver on-site — sirens silenced & supervised" else "Nursery unattended — automated alarms active",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (adultPresent) Color(0xFF2E7D32) else Color.Gray
+                            )
+                        }
+                        Switch(
+                            checked = adultPresent,
+                            onCheckedChange = { isPresent ->
+                                adultPresent = isPresent
+                                if (isPresent) {
+                                    if (ringtone.isPlaying) ringtone.stop()
+                                    isAlarmSilenced = true
+                                    sendNow(simulateHazard = false)
+                                }
+                            }
+                        )
                     }
 
                     val sendInteractionSource = remember { MutableInteractionSource() }
