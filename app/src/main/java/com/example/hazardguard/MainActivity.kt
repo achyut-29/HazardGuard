@@ -317,7 +317,7 @@ fun CameraObservationPreview(
                     modifier = Modifier
                         .size(8.dp)
                         .background(
-                            if (isBlocked) Color(0xFFFF5252)
+                            if (isCameraEnabled && isBlocked) Color(0xFFFF5252)
                             else if (isCameraEnabled && hasCameraPermission) Color(0xFF00E676)
                             else Color.Gray,
                             RoundedCornerShape(4.dp)
@@ -325,9 +325,9 @@ fun CameraObservationPreview(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    if (isBlocked) "⚠️ LENS OBSTRUCTED"
+                    if (isCameraEnabled && isBlocked) "⚠️ LENS OBSTRUCTED"
                     else if (isCameraEnabled && hasCameraPermission) "LIVE CHILD OBSERVATION"
-                    else "CAMERA STANDBY",
+                    else "CAMERA OFF",
                     color = Color.White,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold
@@ -573,7 +573,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                 put("battery_temp_c", if (simulateHazard) 37.0 else (batteryTemp ?: 0f).toDouble())
                 put("charging", charging)
                 put("camera_active", cameraActive)
-                put("camera_blocked", if (simulateHazard) false else isCameraBlocked)
+                put("camera_blocked", if (simulateHazard) false else (cameraActive && isCameraBlocked))
             })
             put("sensors", JSONObject().apply {
                 put("noise_db", if (simulateHazard) 88.0 else (noise ?: 0f).toDouble())
@@ -701,7 +701,10 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         Text("📹 Nursery Cam", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(if (cameraActive) "ON" else "OFF", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(end = 4.dp))
-                            Switch(checked = cameraActive, onCheckedChange = { cameraActive = it })
+                            Switch(checked = cameraActive, onCheckedChange = {
+                                cameraActive = it
+                                if (!it) isCameraBlocked = false
+                            })
                         }
                     }
 
@@ -759,7 +762,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                             if (!assessment?.action.isNullOrBlank()) {
                                 Text(assessment?.action ?: "", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 4.dp))
                             }
-                            if (isCameraBlocked) {
+                            if (cameraActive && isCameraBlocked) {
                                 Text(
                                     "⚠️ Vision Obstructed: Camera is covered or dark. Line-of-sight to child is lost.",
                                     style = MaterialTheme.typography.labelSmall,
@@ -901,9 +904,9 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                     SensorDetailCard(
                         title = "Camera Vision",
                         value = if (!cameraActive) "Disabled" else if (isCameraBlocked) "Obstructed" else "Active",
-                        subtext = if (isCameraBlocked) "⚠️ Nursery view obstructed" else "Live child line-of-sight active",
+                        subtext = if (!cameraActive) "Camera observation turned off by parent" else if (isCameraBlocked) "⚠️ Nursery view obstructed" else "Live child line-of-sight active",
                         icon = "📹",
-                        isWarning = isCameraBlocked
+                        isWarning = cameraActive && isCameraBlocked
                     )
 
                     Button(
