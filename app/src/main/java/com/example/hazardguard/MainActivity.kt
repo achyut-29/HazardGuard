@@ -77,10 +77,13 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-private const val DEFAULT_CLOUD_URL = "https://authority-conditioning-cap-korea.trycloudflare.com/webhook/sensor"
-private const val BACKUP_CLOUD_URL = "https://tgcpl-160-187-77-3.free.pinggy.net/webhook/sensor"
+private const val WIFI_LAN_URL = "http://10.1.25.92:5678/webhook/sensor"
+private const val LIVE_PINGGY_URL = "https://sogol-210-212-192-18.free.pinggy.net/webhook/sensor"
 private const val LOCAL_URL = "http://localhost:5678/webhook/sensor"
-private const val WIFI_LAN_URL = "http://10.63.3.116:5678/webhook/sensor"
+private const val HOTSPOT_LAN_URL = "http://192.168.43.1:5678/webhook/sensor"
+private const val HOTSPOT_LINUX_URL = "http://10.42.0.1:5678/webhook/sensor"
+private const val HOTSPOT_ALT_URL = "http://192.168.137.1:5678/webhook/sensor"
+private const val OLD_WIFI_LAN_URL = "http://10.63.3.116:5678/webhook/sensor"
 private const val ROOM = "nursery"
 private const val CHILD_AGE = 1
 private const val SEND_EVERY_MS = 60000L
@@ -89,6 +92,7 @@ private const val TILT_TOPPLE_THRESHOLD = 115f
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         enableEdgeToEdge()
         setContent {
             HazardGuardTheme {
@@ -112,14 +116,17 @@ data class Assessment(
 
 suspend fun postReading(customUrl: String, body: JSONObject): Assessment = withContext(Dispatchers.IO) {
     val urls = linkedSetOf<String>().apply {
-        add(LOCAL_URL)
-        add(WIFI_LAN_URL)
         val validCustom = customUrl.trim()
-        if (validCustom.isNotBlank() && !validCustom.contains("ftkkl") && !validCustom.contains("dddci") && !validCustom.contains("hbrul") && !validCustom.contains("ewlsx")) {
+        if (validCustom.isNotBlank() && !validCustom.contains("authority-conditioning") && !validCustom.contains("tgcpl") && !validCustom.contains("ftkkl") && !validCustom.contains("dddci") && !validCustom.contains("hbrul") && !validCustom.contains("ewlsx")) {
             add(validCustom)
         }
-        add(DEFAULT_CLOUD_URL)
-        add(BACKUP_CLOUD_URL)
+        add(WIFI_LAN_URL)
+        add(LOCAL_URL)
+        add(HOTSPOT_LAN_URL)
+        add(HOTSPOT_LINUX_URL)
+        add(HOTSPOT_ALT_URL)
+        add(LIVE_PINGGY_URL)
+        add(OLD_WIFI_LAN_URL)
     }
     var lastException: Exception? = null
     for (urlString in urls) {
@@ -127,7 +134,7 @@ suspend fun postReading(customUrl: String, body: JSONObject): Assessment = withC
         try {
             conn = URL(urlString).openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
-            conn.connectTimeout = 4000
+            conn.connectTimeout = 2500
             conn.readTimeout = 45000
             conn.doOutput = true
             conn.setRequestProperty("Content-Type", "application/json")
@@ -534,7 +541,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
 
     var endpointUrl by remember {
         val saved = prefs.getString("webhook_url", null)
-        mutableStateOf(if (saved.isNullOrBlank() || saved.contains("pinggy") || !saved.contains("authority-conditioning")) DEFAULT_CLOUD_URL else saved)
+        mutableStateOf(if (saved.isNullOrBlank() || saved.contains("authority-conditioning") || saved.contains("tgcpl")) WIFI_LAN_URL else saved)
     }
     var emergencyContactNumber by remember {
         val num = prefs.getString("emergency_contact_number", null)
@@ -1357,14 +1364,26 @@ fun SensorScreen(modifier: Modifier = Modifier) {
 
                     Button(
                         onClick = {
-                            endpointUrl = DEFAULT_CLOUD_URL
-                            prefs.edit().putString("webhook_url", DEFAULT_CLOUD_URL).apply()
+                            endpointUrl = WIFI_LAN_URL
+                            prefs.edit().putString("webhook_url", WIFI_LAN_URL).apply()
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 8.dp)
                     ) {
-                        Text("Reset to Default Cloud URL")
+                        Text("Reset to Campus Wi-Fi (10.1.25.92)")
+                    }
+
+                    Button(
+                        onClick = {
+                            endpointUrl = LIVE_PINGGY_URL
+                            prefs.edit().putString("webhook_url", LIVE_PINGGY_URL).apply()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 4.dp)
+                    ) {
+                        Text("Switch to Pinggy Tunnel")
                     }
                 }
             }
