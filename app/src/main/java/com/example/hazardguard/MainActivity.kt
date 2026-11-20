@@ -595,6 +595,67 @@ fun SensorScreen(modifier: Modifier = Modifier) {
     var assessment by remember { mutableStateOf<Assessment?>(null) }
     var busy by remember { mutableStateOf(false) }
 
+    fun sendNow(simulateHazard: Boolean = false) {
+        if (busy) return
+        busy = true
+        val body = JSONObject().apply {
+            put("timestamp", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(Date()))
+            put("room", ROOM)
+            put("child_age", CHILD_AGE)
+            put("adult_present", if (simulateHazard) false else adultPresent)
+            put("phone", JSONObject().apply {
+                put("light_lux", if (simulateHazard) 5.0 else (lux ?: 0f).toDouble())
+                put("battery_temp_c", if (simulateHazard) 37.0 else (batteryTemp ?: 0f).toDouble())
+                put("charging", charging)
+                put("camera_active", cameraActive)
+                put("camera_blocked", if (simulateHazard) false else (cameraActive && isCameraBlocked))
+            })
+            put("sensors", JSONObject().apply {
+                put("noise_db", if (simulateHazard) 88.0 else (noise ?: 0f).toDouble())
+                put("pitch_hz", if (simulateHazard) 580.0 else pitchHz.toDouble())
+                put("child_cry_detected", if (simulateHazard) true else isChildCry)
+                put("motion_ms2", if (simulateHazard) 15.0 else (accel ?: 9.81f).toDouble())
+                put("tilt_deg", if (simulateHazard) 110.0 else (tilt ?: 0f).toDouble())
+                if (simulateHazard) {
+                    put("smoke_level", 0.70)
+                    put("gas_ppm", 650.0)
+                }
+            })
+            put("history", JSONArray())
+        }
+        if (simulateHazard) {
+            // Immediate zero-latency demo trigger: Instant red alert, siren, and dispatch buttons
+            assessment = Assessment(
+                level = "high",
+                prediction = "CRITICAL: Fast-rising environmental surge with infant acoustic distress (>85 dB).",
+                action = "Trigger emergency siren immediately! Physical parental intervention required.",
+                alarmSound = true,
+                emergencyCallRecommended = true,
+                alertTitle = "🚨 URGENT: DANGER DETECTED",
+                emergencySmsContent = "EMERGENCY: High hazard near child in nursery! Severe crying & fallen device detected. Check immediately!"
+            )
+            isAlarmSilenced = false
+            status = "⚡ Hazard Active (Instant Response)"
+        }
+        scope.launch {
+            if (!simulateHazard) {
+                status = "Sending to AI crew..."
+            }
+            val t0 = System.currentTimeMillis()
+            try {
+                val remoteAssessment = postReading(endpointUrl, body)
+                assessment = remoteAssessment
+                status = if (simulateHazard) "OK - AI verified in ${(System.currentTimeMillis() - t0) / 1000} s" else "OK - answered in ${(System.currentTimeMillis() - t0) / 1000} s"
+            } catch (e: Exception) {
+                if (!simulateHazard) {
+                    status = "Failed: ${e.javaClass.simpleName}: ${e.message}"
+                }
+            } finally {
+                busy = false
+            }
+        }
+    }
+
     var micGranted by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
@@ -668,6 +729,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             if (!ringtone.isPlaying) {
                 triggerWarningAlert(context)
             }
+            sendNow()
         }
         lastCameraBlocked = blockedNow
     }
@@ -678,6 +740,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             if (!ringtone.isPlaying) {
                 triggerWarningAlert(context)
             }
+            sendNow()
         }
         lastChildCry = isChildCry
     }
@@ -689,6 +752,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             if (!ringtone.isPlaying) {
                 triggerWarningAlert(context)
             }
+            sendNow()
         }
         lastTiltWarning = isTiltedNow
     }
@@ -736,67 +800,6 @@ fun SensorScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    fun sendNow(simulateHazard: Boolean = false) {
-        if (busy) return
-        busy = true
-        val body = JSONObject().apply {
-            put("timestamp", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).format(Date()))
-            put("room", ROOM)
-            put("child_age", CHILD_AGE)
-            put("adult_present", if (simulateHazard) false else adultPresent)
-            put("phone", JSONObject().apply {
-                put("light_lux", if (simulateHazard) 5.0 else (lux ?: 0f).toDouble())
-                put("battery_temp_c", if (simulateHazard) 37.0 else (batteryTemp ?: 0f).toDouble())
-                put("charging", charging)
-                put("camera_active", cameraActive)
-                put("camera_blocked", if (simulateHazard) false else (cameraActive && isCameraBlocked))
-            })
-            put("sensors", JSONObject().apply {
-                put("noise_db", if (simulateHazard) 88.0 else (noise ?: 0f).toDouble())
-                put("pitch_hz", if (simulateHazard) 580.0 else pitchHz.toDouble())
-                put("child_cry_detected", if (simulateHazard) true else isChildCry)
-                put("motion_ms2", if (simulateHazard) 15.0 else (accel ?: 9.81f).toDouble())
-                put("tilt_deg", if (simulateHazard) 110.0 else (tilt ?: 0f).toDouble())
-                if (simulateHazard) {
-                    put("smoke_level", 0.70)
-                    put("gas_ppm", 650.0)
-                }
-            })
-            put("history", JSONArray())
-        }
-        if (simulateHazard) {
-            // Immediate zero-latency demo trigger: Instant red alert, siren, and dispatch buttons
-            assessment = Assessment(
-                level = "high",
-                prediction = "CRITICAL: Fast-rising environmental surge with infant acoustic distress (>85 dB).",
-                action = "Trigger emergency siren immediately! Physical parental intervention required.",
-                alarmSound = true,
-                emergencyCallRecommended = true,
-                alertTitle = "🚨 URGENT: DANGER DETECTED",
-                emergencySmsContent = "EMERGENCY: High hazard near child in nursery! Severe crying & fallen device detected. Check immediately!"
-            )
-            isAlarmSilenced = false
-            status = "⚡ Hazard Active (Instant Response)"
-        }
-        scope.launch {
-            if (!simulateHazard) {
-                status = "Sending to AI crew..."
-            }
-            val t0 = System.currentTimeMillis()
-            try {
-                val remoteAssessment = postReading(endpointUrl, body)
-                assessment = remoteAssessment
-                status = if (simulateHazard) "OK - AI verified in ${(System.currentTimeMillis() - t0) / 1000} s" else "OK - answered in ${(System.currentTimeMillis() - t0) / 1000} s"
-            } catch (e: Exception) {
-                if (!simulateHazard) {
-                    status = "Failed: ${e.javaClass.simpleName}: ${e.message}"
-                }
-            } finally {
-                busy = false
-            }
-        }
-    }
-
     LaunchedEffect(Unit) {
         delay(3000)
         while (true) {
@@ -805,11 +808,43 @@ fun SensorScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    val levelColor = when (assessment?.level) {
+    val isPhysicalWarning = (tilt ?: 0f) > 75f || isChildCry || (cameraActive && isCameraBlocked)
+    val effectiveLevel = when {
+        assessment?.level == "high" -> "high"
+        isPhysicalWarning || assessment?.level == "medium" -> "medium"
+        else -> assessment?.level ?: "low"
+    }
+
+    val levelColor = when (effectiveLevel) {
         "low" -> Color(0xFF2E7D32)
         "medium" -> Color(0xFFF9A825)
         "high" -> Color(0xFFC62828)
         else -> Color.Gray
+    }
+
+    val effectiveTitle = when {
+        assessment?.level == "high" -> assessment?.alertTitle ?: "🚨 CRITICAL HAZARD"
+        (tilt ?: 0f) > 75f -> "⚠️ CAUTION: Stand Toppled (>75°)"
+        isChildCry -> "⚠️ CAUTION: Infant Distress Cry"
+        cameraActive && isCameraBlocked -> "⚠️ CAUTION: Camera View Obstructed"
+        !assessment?.alertTitle.isNullOrBlank() -> assessment?.alertTitle ?: "Nursery Status"
+        else -> "Nursery Status"
+    }
+
+    val effectivePrediction = when {
+        (tilt ?: 0f) > 75f -> "Phone is tilted at %.0f° — nursery stand or cradle has fallen.".format(tilt ?: 0f)
+        isChildCry -> "Acute acoustic crying pitch (%.0f Hz) detected in nursery.".format(pitchHz)
+        cameraActive && isCameraBlocked -> "Camera lens is covered or dark. Line-of-sight to child is lost."
+        !assessment?.prediction.isNullOrBlank() -> assessment?.prediction ?: ""
+        else -> "All environmental sensors normal. Continuous monitoring active."
+    }
+
+    val effectiveAction = when {
+        (tilt ?: 0f) > 75f -> "Reposition phone on stable stand."
+        isChildCry -> "Check on infant immediately."
+        cameraActive && isCameraBlocked -> "Clear obstruction from camera lens."
+        !assessment?.action.isNullOrBlank() -> assessment?.action ?: ""
+        else -> ""
     }
 
     Column(
@@ -997,32 +1032,23 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    assessment?.alertTitle.takeIf { !it.isNullOrBlank() } ?: "Nursery Status",
+                                    effectiveTitle,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = levelColor
                                 )
                                 Text(
-                                    "Risk: ${assessment?.level?.uppercase() ?: "SAFE"}",
+                                    "Risk: ${effectiveLevel.uppercase()}",
                                     style = MaterialTheme.typography.labelLarge,
                                     fontWeight = FontWeight.Bold,
                                     color = levelColor
                                 )
                             }
-                            if (!assessment?.prediction.isNullOrBlank()) {
-                                Text(assessment?.prediction ?: "", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                            if (effectivePrediction.isNotBlank()) {
+                                Text(effectivePrediction, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                             }
-                            if (!assessment?.action.isNullOrBlank()) {
-                                Text(assessment?.action ?: "", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 4.dp))
-                            }
-                            if (cameraActive && isCameraBlocked) {
-                                Text(
-                                    "⚠️ Vision Obstructed: Camera is covered or dark. Line-of-sight to child is lost.",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFC62828),
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
+                            if (effectiveAction.isNotBlank()) {
+                                Text(effectiveAction, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 4.dp))
                             }
                         }
                     }
