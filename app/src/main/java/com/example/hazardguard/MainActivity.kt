@@ -32,7 +32,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -740,12 +743,19 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.bodyMedium
                     )
+                    val silenceInteractionSource = remember { MutableInteractionSource() }
+                    val isSilencePressed by silenceInteractionSource.collectIsPressedAsState()
+                    val silenceColor by animateColorAsState(
+                        if (isSilencePressed) Color(0xFFEF5350) else Color(0xFFB71C1C),
+                        label = "silenceColor"
+                    )
                     Button(
                         onClick = {
                             ringtone.stop()
                             isAlarmSilenced = true
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB71C1C))
+                        interactionSource = silenceInteractionSource,
+                        colors = ButtonDefaults.buttonColors(containerColor = silenceColor)
                     ) {
                         Text("Silence", color = Color.White)
                     }
@@ -853,6 +863,16 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                             .padding(top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        val callInteractionSource = remember { MutableInteractionSource() }
+                        val isCallPressed by callInteractionSource.collectIsPressedAsState()
+                        val isEmergencyCall = assessment?.emergencyCallRecommended == true || assessment?.level == "high"
+                        val callButtonTargetColor = when {
+                            isCallPressed -> Color(0xFFFF8A80)
+                            isEmergencyCall -> Color(0xFFC62828)
+                            else -> MaterialTheme.colorScheme.primaryContainer
+                        }
+                        val callButtonColor by animateColorAsState(callButtonTargetColor, label = "callColor")
+
                         Button(
                             onClick = {
                                 if (emergencyContactNumber.isNotBlank()) {
@@ -862,18 +882,24 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                             },
                             enabled = emergencyContactNumber.isNotBlank(),
                             modifier = Modifier.weight(1f),
-                            colors = if (assessment?.emergencyCallRecommended == true || assessment?.level == "high")
-                                ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
-                            else ButtonDefaults.buttonColors()
+                            interactionSource = callInteractionSource,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = callButtonColor,
+                                contentColor = if (isEmergencyCall) Color.White else MaterialTheme.colorScheme.onPrimaryContainer
+                            )
                         ) {
                             Text(
-                                if (assessment?.emergencyCallRecommended == true || assessment?.level == "high")
-                                    "🚨 Call $contactLabel"
+                                if (isEmergencyCall) "🚨 Call $contactLabel"
                                 else "📞 Call $contactLabel"
                             )
                         }
 
                         if (!assessment?.emergencySmsContent.isNullOrBlank() && emergencyContactNumber.isNotBlank()) {
+                            val smsInteractionSource = remember { MutableInteractionSource() }
+                            val isSmsPressed by smsInteractionSource.collectIsPressedAsState()
+                            val smsButtonTargetColor = if (isSmsPressed) Color(0xFFFFAB91) else Color(0xFFD84315)
+                            val smsButtonColor by animateColorAsState(smsButtonTargetColor, label = "smsColor")
+
                             Button(
                                 onClick = {
                                     val smsIntent = Intent(Intent.ACTION_SENDTO).apply {
@@ -883,7 +909,8 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                                     context.startActivity(smsIntent)
                                 },
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFD84315))
+                                interactionSource = smsInteractionSource,
+                                colors = ButtonDefaults.buttonColors(containerColor = smsButtonColor)
                             ) {
                                 Text("💬 SMS $contactLabel")
                             }
@@ -901,6 +928,25 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         Switch(checked = adultPresent, onCheckedChange = { adultPresent = it })
                     }
 
+                    val sendInteractionSource = remember { MutableInteractionSource() }
+                    val isSendPressed by sendInteractionSource.collectIsPressedAsState()
+                    val sendButtonTargetColor = when {
+                        isSendPressed -> Color(0xFF64B5F6)
+                        busy -> Color(0xFF42A5F5)
+                        else -> MaterialTheme.colorScheme.primary
+                    }
+                    val sendButtonColor by animateColorAsState(sendButtonTargetColor, label = "sendColor")
+
+                    val hazardInteractionSource = remember { MutableInteractionSource() }
+                    val isHazardPressed by hazardInteractionSource.collectIsPressedAsState()
+                    val isHazardActive = assessment?.level == "high"
+                    val hazardButtonTargetColor = when {
+                        isHazardPressed -> Color(0xFFFF8A80)
+                        isHazardActive -> Color(0xFFE53935)
+                        else -> Color(0xFFC62828)
+                    }
+                    val hazardButtonColor by animateColorAsState(hazardButtonTargetColor, label = "hazardColor")
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -909,16 +955,19 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                     ) {
                         Button(
                             onClick = { sendNow(simulateHazard = false) },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            interactionSource = sendInteractionSource,
+                            colors = ButtonDefaults.buttonColors(containerColor = sendButtonColor)
                         ) {
-                            Text("Send Real Data")
+                            Text(if (busy) "Transmitting..." else "Send Real Data")
                         }
                         Button(
                             onClick = { sendNow(simulateHazard = true) },
                             modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828))
+                            interactionSource = hazardInteractionSource,
+                            colors = ButtonDefaults.buttonColors(containerColor = hazardButtonColor)
                         ) {
-                            Text("⚡ Test Hazard")
+                            Text(if (isHazardActive) "⚡ Hazard Active" else "⚡ Test Hazard")
                         }
                     }
                 }
@@ -982,13 +1031,24 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         isWarning = cameraActive && isCameraBlocked
                     )
 
+                    val tab1SendInteractionSource = remember { MutableInteractionSource() }
+                    val isTab1SendPressed by tab1SendInteractionSource.collectIsPressedAsState()
+                    val tab1SendTargetColor = when {
+                        isTab1SendPressed -> Color(0xFF64B5F6)
+                        busy -> Color(0xFF42A5F5)
+                        else -> MaterialTheme.colorScheme.primary
+                    }
+                    val tab1SendColor by animateColorAsState(tab1SendTargetColor, label = "tab1SendColor")
+
                     Button(
                         onClick = { sendNow(simulateHazard = false) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 16.dp, bottom = 20.dp)
+                            .padding(top = 16.dp, bottom = 20.dp),
+                        interactionSource = tab1SendInteractionSource,
+                        colors = ButtonDefaults.buttonColors(containerColor = tab1SendColor)
                     ) {
-                        Text("Transmit Telemetry to AI Crew")
+                        Text(if (busy) "Transmitting Telemetry..." else "Transmit Telemetry to AI Crew")
                     }
                 }
             }
