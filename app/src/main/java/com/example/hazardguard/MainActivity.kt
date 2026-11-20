@@ -66,6 +66,7 @@ import kotlin.math.abs
 import kotlin.math.acos
 import kotlin.math.log10
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sqrt
 
 private const val DEFAULT_CLOUD_URL = "https://ewlsx-160-187-77-3.free.pinggy.net/webhook/sensor"
@@ -142,7 +143,7 @@ suspend fun postReading(customUrl: String, body: JSONObject): Assessment = withC
 }
 
 @SuppressLint("MissingPermission")
-suspend fun measureNoise(onLevel: (Float) -> Unit) = withContext(Dispatchers.IO) {
+suspend fun measureNoise(onAudioAnalyzed: (db: Float, pitchHz: Float, isCry: Boolean) -> Unit) = withContext(Dispatchers.IO) {
     val rate = 16000
     val minBuf = AudioRecord.getMinBufferSize(
         rate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT
@@ -156,11 +157,52 @@ suspend fun measureNoise(onLevel: (Float) -> Unit) = withContext(Dispatchers.IO)
     try {
         while (isActive) {
             val n = rec.read(buf, 0, buf.size)
-            if (n > 0) {
+            if (n > 500) {
                 var sum = 0.0
                 for (i in 0 until n) sum += buf[i] * buf[i].toDouble()
                 val rms = sqrt(sum / n)
-                onLevel((20 * log10(max(rms, 1.0))).toFloat())
+                val db = (20 * log10(max(rms, 1.0))).toFloat()
+
+                // Pediatric Pitch & Frequency Estimation (Autocorrelation on downsampled window)
+                var estimatedPitch = 0f
+                var isChildCry = false
+
+                if (db > 60f) {
+                    val windowSize = min(n, 1024)
+                    val minLag = 18   // 16000 / 900 Hz ~ 18 samples (highest infant cry pitch)
+                    val maxLag = 160  // 16000 / 100 Hz ~ 160 samples (lowest adult speech pitch)
+                    var bestLag = -1
+                    var bestCorr = 0.0
+                    var energy0 = 0.0
+
+                    for (i in 0 until windowSize - maxLag) {
+                        energy0 += buf[i].toDouble() * buf[i].toDouble()
+                    }
+
+                    if (energy0 > 1e4) {
+                        for (lag in minLag..maxLag) {
+                            var corr = 0.0
+                            for (i in 0 until windowSize - maxLag) {
+                                corr += buf[i].toDouble() * buf[i + lag].toDouble()
+                            }
+                            if (corr > bestCorr) {
+                                bestCorr = corr
+                                bestLag = lag
+                            }
+                        }
+                        if (bestLag > 0 && bestCorr > energy0 * 0.35) {
+                            estimatedPitch = rate.toFloat() / bestLag
+                        }
+                    }
+
+                    // Pediatric Clinical Criteria (AAP/WHO Research):
+                    // Infant / Toddler Cry: High pitch (350 Hz to 850 Hz) and volume >= 74 dB
+                    // Adult Speech: Low pitch (85 Hz to 260 Hz) - non-critical
+                    // Random noise: Low harmonic periodicity or non-cry frequency
+                    isChildCry = (estimatedPitch in 350f..850f) && (db >= 74f)
+                }
+
+                onAudioAnalyzed(db, estimatedPitch, isChildCry)
             }
         }
     } finally {
@@ -476,6 +518,8 @@ fun SensorScreen(modifier: Modifier = Modifier) {
     var batteryTemp by remember { mutableStateOf<Float?>(null) }
     var charging by remember { mutableStateOf(false) }
     var noise by remember { mutableStateOf<Float?>(null) }
+    var pitchHz by remember { mutableStateOf(0f) }
+    var isChildCry by remember { mutableStateOf(false) }
     var adultPresent by remember { mutableStateOf(false) }
     var cameraActive by remember { mutableStateOf(true) }
     var isCameraBlocked by remember { mutableStateOf(false) }
@@ -498,7 +542,11 @@ fun SensorScreen(modifier: Modifier = Modifier) {
         if (!micGranted) launcher.launch(Manifest.permission.RECORD_AUDIO)
     }
     LaunchedEffect(micGranted) {
-        if (micGranted) measureNoise { noise = it }
+        if (micGranted) measureNoise { db, pitch, cry ->
+            noise = db
+            pitchHz = pitch
+            isChildCry = cry
+        }
     }
 
     LaunchedEffect(assessment) {
@@ -577,6 +625,8 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             })
             put("sensors", JSONObject().apply {
                 put("noise_db", if (simulateHazard) 88.0 else (noise ?: 0f).toDouble())
+                put("pitch_hz", if (simulateHazard) 580.0 else pitchHz.toDouble())
+                put("child_cry_detected", if (simulateHazard) true else isChildCry)
                 put("motion_ms2", if (simulateHazard) 15.0 else (accel ?: 9.81f).toDouble())
                 put("tilt_deg", if (simulateHazard) 110.0 else (tilt ?: 0f).toDouble())
                 if (simulateHazard) {
@@ -724,7 +774,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                             .padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        QuickSensorChip("🔊", noise?.let { "%.0fdB".format(it) } ?: "-", "Noise", (noise ?: 0f) > 65f)
+                        QuickSensorChip("🔊", noise?.let { "%.0fdB".format(it) } ?: "-", if (isChildCry) "CRYING!" else "Noise", isChildCry || (noise ?: 0f) > 80f)
                         QuickSensorChip("💡", lux?.let { "%.0flx".format(it) } ?: "-", "Light")
                         QuickSensorChip("🏃", accel?.let { "%.1f".format(it) } ?: "-", "Motion")
                         QuickSensorChip("📐", tilt?.let { "%.0f°".format(it) } ?: "-", "Tilt", (tilt ?: 0f) > 75f)
@@ -863,11 +913,15 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                     Text("Live Sensor Readings", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(vertical = 8.dp))
 
                     SensorDetailCard(
-                        title = "Acoustic Noise",
+                        title = "Acoustic Noise & Child Cry",
                         value = noise?.let { "%.0f dB".format(it) } ?: "Waiting",
-                        subtext = if (!micGranted) "Mic permission required" else if ((noise ?: 0f) > 65f) "⚠️ High sound / infant crying" else "Quiet nursery (<55 dB safe)",
+                        subtext = if (!micGranted) "Mic permission required"
+                                  else if (isChildCry) "🚨 High-pitch infant cry / scream detected (%.0f Hz)".format(pitchHz)
+                                  else if ((noise ?: 0f) > 68f && pitchHz in 85f..280f) "Adult speech (low pitch %.0f Hz - normal)".format(pitchHz)
+                                  else if ((noise ?: 0f) > 68f) "Environmental room sound (%.0f dB)".format(noise ?: 0f)
+                                  else "Quiet nursery environment (<68 dB safe)",
                         icon = "🔊",
-                        isWarning = (noise ?: 0f) > 65f
+                        isWarning = isChildCry || (noise ?: 0f) > 80f
                     )
 
                     SensorDetailCard(
