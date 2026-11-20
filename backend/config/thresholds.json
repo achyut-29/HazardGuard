@@ -1,0 +1,30 @@
+{
+  "gas_ppm": {
+    "safe": 200,
+    "danger": 500
+  },
+  "smoke_level": {
+    "safe": 0.1,
+    "danger": 0.4
+  },
+  "co2_ppm": {
+    "safe": 1000,
+    "danger": 2000
+  },
+  "temp_c": {
+    "safe": 28,
+    "danger": 35
+  },
+  "noise_db": {
+    "safe": 68,
+    "danger": 86
+  },
+  "motion_dev": {
+    "safe": 2.0,
+    "danger": 12.0
+  },
+  "tilt_deg": {
+    "safe": 110,
+    "danger": 125
+  }
+}

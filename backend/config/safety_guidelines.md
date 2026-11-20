@@ -1,0 +1,7 @@
+- Toddlers (0-3) need an adult nearby at all times in kitchens, bathrooms and near windows.
+- Children 4-6 should not be alone near stoves, gas, hot surfaces or open windows.
+- Children 7-10 can be alone briefly in a safe room, but not near active gas or heat sources.
+- Rising gas, smoke or CO2 near a young child is urgent even before it reaches the danger level.
+- Room temperature above 30 C is a heat risk for babies and toddlers.
+- A crying child with no adult present should be checked on quickly.
+- First actions: remove the child from the area, ventilate, turn off the source, then call for help if needed.

@@ -119,22 +119,56 @@ Zero-downtime multi-tier communication layer ensuring unbroken edge-to-cloud tel
 
 ## 🛠️ Tech Stack
 
-- **Platform**: Android 14+ (API 34)
-- **Language**: Kotlin 2.0+
-- **UI Architecture**: Jetpack Compose & Material Design 3
-- **Sensors**: SensorManager (Light, Accelerometer), AudioRecord PCM 16-bit FFT, BatteryManager, Camera2 / CameraX
-- **Concurrency**: Kotlin Coroutines & StateFlow
+- **Edge Mobile Platform**: Android 14+ (API 34), Kotlin 2.0+, Jetpack Compose, Material Design 3
+- **Sensors & Signal Processing**: SensorManager (Ambient Lux, 3D Accelerometer), AudioRecord PCM 16-bit FFT Pitch Autocorrelation, BatteryManager, Camera2 API
+- **Multi-Agent Orchestration**: CrewAI, Google Gemini (`gemini-2.5-flash` / `gemini-1.5-pro`), Groq fallback
+- **Backend Microservices**: Python 3.10+, FastAPI (Asynchronous REST on `:8000`), Uvicorn, Pydantic v2
+- **Automation & Ingestion**: n8n Workflow Automation Engine (`:5678`), Docker
+- **Networking**: Direct Wi-Fi LAN routing, Wireless ADB Daemon (`:5555`), SSH Pinggy & Cloudflare Tunnels
+
+---
+
+## 📁 Repository Structure
+
+```text
+HazardGuard/
+├── app/                  # Edge Mobile Sentinel (Kotlin, Jetpack Compose, Camera2, Audio FFT)
+│   ├── src/main/java/com/example/hazardguard/
+│   │   ├── MainActivity.kt   # Core edge sensing, HITL state machine & reflexes
+│   │   └── ui/               # Jetpack Compose UI theme & components
+│   └── build.gradle.kts      # Android application dependencies
+│
+└── backend/              # Deliberative Multi-Agent Cognitive Hierarchy
+    ├── crew.py               # 6-Agent CrewAI pipeline & Gemini Pro integration
+    ├── main.py               # Asynchronous FastAPI ingest endpoint (Port 8000)
+    ├── features.py           # Mathematical derivatives & physics forecasting
+    ├── config/               # Pediatric AAP/WHO medical limits & safety guidelines
+    ├── adb_reverse_daemon.sh # Auto-reconnecting wireless ADB reverse proxy
+    └── requirements.txt      # Python dependencies (CrewAI, FastAPI, Pydantic)
+```
 
 ---
 
 ## 🚀 Getting Started
 
+### 1. Launch the Deliberative AI Backend
 ```bash
-# Clone the repository
-git clone https://github.com/achyut-29/HazardGuard.git
-cd HazardGuard
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
-# Build debug APK
+# Configure Gemini API Key
+export GEMINI_API_KEY="your-gemini-api-key"
+
+# Start the FastAPI cognitive service
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+### 2. Build & Launch the Edge Android App
+```bash
+# Return to root and build debug APK
+cd ..
 ./gradlew assembleDebug
 
 # Install on target device
