@@ -904,16 +904,18 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                     Text("⚠️", modifier = Modifier.padding(end = 8.dp), style = MaterialTheme.typography.titleMedium)
                     Column(modifier = Modifier.weight(1f)) {
                         val warningTitle = when {
-                            cameraActive && isCameraBlocked -> "CAUTION: Camera Lens Obstructed"
-                            isChildCry -> "CAUTION: Infant Distress Cry Detected"
-                            (tilt ?: 0f) > 75f -> "CAUTION: Stand Toppled (>75°)"
-                            else -> "CAUTION: Nursery Warning (${assessment?.alertTitle.takeIf { !it.isNullOrBlank() } ?: "Elevated Risk"})"
+                            cameraActive && isCameraBlocked -> "⚠️ CAUTION: Camera View Obstructed"
+                            isChildCry -> "⚠️ CAUTION: Infant Distress Cry"
+                            (tilt ?: 0f) > 75f -> "⚠️ CAUTION: Stand Toppled (>75°)"
+                            !assessment?.alertTitle.isNullOrBlank() -> assessment?.alertTitle ?: "⚠️ CAUTION: Nursery Attention"
+                            else -> "⚠️ CAUTION: Nursery Attention"
                         }
                         val warningDetail = when {
-                            cameraActive && isCameraBlocked -> "Line-of-sight to child is lost. Clear camera obstruction."
-                            isChildCry -> "High-pitch acoustic cry frequency (%.0f Hz) detected.".format(pitchHz)
-                            (tilt ?: 0f) > 75f -> "Device is tilted at %.0f° — reposition stand.".format(tilt ?: 0f)
-                            else -> assessment?.prediction ?: "Environmental parameters require attention."
+                            cameraActive && isCameraBlocked -> "Camera lens is covered or dark. Line-of-sight to child is lost."
+                            isChildCry -> "Pediatric distress pitch (%.0f Hz) detected.".format(pitchHz)
+                            (tilt ?: 0f) > 75f -> "Device is tilted at %.0f° — reposition stable stand.".format(tilt ?: 0f)
+                            !assessment?.action.isNullOrBlank() -> assessment?.action ?: ""
+                            else -> assessment?.prediction ?: "Environmental parameters require caregiver attention."
                         }
                         Text(
                             warningTitle,
