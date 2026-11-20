@@ -77,8 +77,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-private const val DEFAULT_CLOUD_URL = "https://intro-participating-investment-straight.trycloudflare.com/webhook/sensor"
-private const val BACKUP_CLOUD_URL = "https://uehoc-160-187-77-3.free.pinggy.net/webhook/sensor"
+private const val DEFAULT_CLOUD_URL = "https://authority-conditioning-cap-korea.trycloudflare.com/webhook/sensor"
+private const val BACKUP_CLOUD_URL = "https://tgcpl-160-187-77-3.free.pinggy.net/webhook/sensor"
 private const val LOCAL_URL = "http://localhost:5678/webhook/sensor"
 private const val WIFI_LAN_URL = "http://10.63.3.116:5678/webhook/sensor"
 private const val ROOM = "nursery"
@@ -534,7 +534,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
 
     var endpointUrl by remember {
         val saved = prefs.getString("webhook_url", null)
-        mutableStateOf(if (saved.isNullOrBlank() || saved.contains("pinggy") || !saved.contains("trycloudflare.com")) DEFAULT_CLOUD_URL else saved)
+        mutableStateOf(if (saved.isNullOrBlank() || saved.contains("pinggy") || !saved.contains("authority-conditioning")) DEFAULT_CLOUD_URL else saved)
     }
     var emergencyContactNumber by remember {
         val num = prefs.getString("emergency_contact_number", null)
