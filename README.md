@@ -31,8 +31,13 @@ HazardGuard employs a **Dual-Loop Agentic Architecture** separating fast reactiv
                                    ▼
     [ Deliberative Multi-Agent Hierarchy (Cloud AI Crew) ]
     ┌──────────────────────────────────────────────────────────────┐
-    │  • 6-Agent Collaborative CrewAI Pipeline (Google Gemini)     │
-    │  • 10-Minute Predictive Horizon & Rate-of-Change Trajectory  │
+    │  • 6-Agent Collaborative CrewAI Pipeline (Google Gemini):    │
+    │    1. Physical Perception Agent (Lux, Tilt, Motion, Temp)    │
+    │    2. Child Observation & Acoustic Agent (FFT Cry, Camera)   │
+    │    3. Risk Predictor Agent (10-Min Trajectory, Derivatives)  │
+    │    4. Safety Knowledge Agent (AAP/WHO Pediatric Guidelines)  │
+    │    5. Parent Action Planner Agent (Synthesized Advice)       │
+    │    6. Emergency Dispatcher & Siren Agent (Siren, Auto-Call)  │
     │  • Multi-Agent Consensus Risk Synthesis                      │
     │  • Autonomous Actuation & Telephony Dispatch                 │
     └──────────────────────────────────────────────────────────────┘
@@ -43,11 +48,11 @@ HazardGuard employs a **Dual-Loop Agentic Architecture** separating fast reactiv
 ## 🌟 Key Capabilities
 
 ### 1. Multi-Modal Edge Sensing & Feature Extraction
-- **Acoustic Spectral Analysis**: Real-time PCM 16-bit audio sampling with FFT pitch tracking to detect pediatric acoustic distress ($400\text{–}600\text{ Hz}$) at high sound pressure levels ($\ge 80\text{ dB}$).
+- **Acoustic Spectral Analysis**: Real-time PCM 16-bit audio sampling with FFT pitch tracking to detect pediatric acoustic distress ($350\text{–}800\text{ Hz}$) at high sound pressure levels ($\ge 75\text{ dB}$).
 - **Kinematic Spatial Orientation**: Continuous 3-axis accelerometer vector analysis tracking spatial tilt angles ($0^\circ\text{–}180^\circ$). Calibrated for upright and angled cradle-monitoring positions ($60^\circ\text{–}110^\circ$), with instant topple/drop reflexes triggered at $>115^\circ$.
 - **Photometric Environment Classification**: Context-aware ambient lux categorization distinguishing sleep-promoting darkness ($<5\text{ lx}$), normal nursery lighting ($10\text{–}300\text{ lx}$), and intense glare ($>1200\text{ lx}$).
 - **Visual Line-of-Sight Supervision**: Real-time camera stream analysis detecting lens obstruction or darkness blanketing to ensure an unbroken monitoring line-of-sight.
-- **Hardware Telemetry**: Monitored battery temperature, thermal trends, and power states.
+- **Hardware Telemetry & Zero-Sleep Sentry**: Continuous battery thermistor tracking and `FLAG_KEEP_SCREEN_ON` enforcement to prevent Android Doze mode or sensor pausing during untethered monitoring.
 
 ### 2. Dual Alert Actuation & Autonomous Dispatch
 - **Tiered Audio Separation**:
@@ -64,12 +69,12 @@ HazardGuard employs a **Dual-Loop Agentic Architecture** separating fast reactiv
   - Dispatches an updated telemetry packet with `adult_present: true` to the cloud multi-agent hierarchy.
   - Suppresses false alerts during active parental caregiving.
 
-### 4. 4-Tier Resilient Transport Routing
+### 4. Resilient Multi-Gateway Transport Routing
 Zero-downtime multi-tier communication layer ensuring unbroken edge-to-cloud telemetry:
-1. **Tier 1 (Localhost ADB Reverse)**: `http://localhost:5678/webhook/sensor`
-2. **Tier 2 (Local Wi-Fi LAN)**: `http://10.63.3.116:5678/webhook/sensor`
-3. **Tier 3 (Zero-Trust Cloudflare Tunnel)**: Public HTTPS edge route (`*.trycloudflare.com`)
-4. **Tier 4 (Cloud Backup Tunnel)**: Fallback remote tunnel
+1. **Tier 1 (Direct Wi-Fi LAN)**: `http://10.1.25.92:5678/webhook/sensor` (instant local subnet routing)
+2. **Tier 2 (ADB Reverse Wireless/USB)**: `http://localhost:5678/webhook/sensor`
+3. **Tier 3 (Mobile Hotspot Gateways)**: Auto-failover across `192.168.43.1`, `10.42.0.1`, `192.168.137.1`
+4. **Tier 4 (Encrypted Public Cloud Tunnel)**: Real-time Pinggy HTTPS bridge (`https://*.free.pinggy.net`) and Cloudflare fallback
 
 ---
 
