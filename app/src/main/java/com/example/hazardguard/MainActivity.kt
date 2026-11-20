@@ -974,7 +974,9 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         QuickSensorChip("🔊", noise?.let { "%.0fdB".format(it) } ?: "-", if (isChildCry) "CRYING!" else "Noise", isChildCry || (noise ?: 0f) > 80f)
-                        QuickSensorChip("💡", lux?.let { "%.0flx".format(it) } ?: "-", "Light")
+                        val lightIcon = if ((lux ?: 50f) < 5f) "🌙" else if ((lux ?: 50f) > 1200f) "☀️" else "💡"
+                        val lightLabel = if ((lux ?: 50f) < 5f) "Night" else if ((lux ?: 50f) > 1200f) "Glare!" else "Light"
+                        QuickSensorChip(lightIcon, lux?.let { "%.0flx".format(it) } ?: "-", lightLabel, isWarning = (lux ?: 50f) > 1500f)
                         QuickSensorChip("🏃", accel?.let { "%.1f".format(it) } ?: "-", "Motion")
                         QuickSensorChip("📐", tilt?.let { "%.0f°".format(it) } ?: "-", "Tilt", (tilt ?: 0f) > 75f)
                         QuickSensorChip("🔋", batteryTemp?.let { "%.0f°C".format(it) } ?: "-", "Temp")
@@ -1161,11 +1163,17 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         isWarning = isChildCry || (noise ?: 0f) > 80f
                     )
 
+                    val lightState = when {
+                        (lux ?: 50f) < 5f -> "🌙 Night nursery (Restful sleeping darkness <5 lx)"
+                        (lux ?: 50f) > 1200f -> "⚠️ Direct intense glare (>1200 lx) — eye risk"
+                        else -> "Normal comfortable nursery ambient light"
+                    }
                     SensorDetailCard(
                         title = "Ambient Lighting",
                         value = lux?.let { "%.0f lux".format(it) } ?: "No data",
-                        subtext = if ((lux ?: 100f) < 5f) "Dim room / night nursery" else "Normal nursery light",
-                        icon = "💡"
+                        subtext = lightState,
+                        icon = if ((lux ?: 50f) < 5f) "🌙" else if ((lux ?: 50f) > 1200f) "☀️" else "💡",
+                        isWarning = (lux ?: 50f) > 1500f
                     )
 
                     SensorDetailCard(
