@@ -79,6 +79,7 @@ import kotlin.math.sqrt
 
 private const val DEFAULT_CLOUD_URL = "https://ewlsx-160-187-77-3.free.pinggy.net/webhook/sensor"
 private const val LOCAL_URL = "http://localhost:5678/webhook/sensor"
+private const val WIFI_LAN_URL = "http://10.63.3.116:5678/webhook/sensor"
 private const val ROOM = "nursery"
 private const val CHILD_AGE = 1
 private const val SEND_EVERY_MS = 60000L
@@ -110,6 +111,7 @@ data class Assessment(
 suspend fun postReading(customUrl: String, body: JSONObject): Assessment = withContext(Dispatchers.IO) {
     val urls = linkedSetOf<String>().apply {
         add(LOCAL_URL)
+        add(WIFI_LAN_URL)
         val validCustom = customUrl.trim()
         if (validCustom.isNotBlank() && !validCustom.contains("trycloudflare") && !validCustom.contains("ftkkl") && !validCustom.contains("dddci") && !validCustom.contains("hbrul")) {
             add(validCustom)
