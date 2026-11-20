@@ -84,6 +84,7 @@ private const val WIFI_LAN_URL = "http://10.63.3.116:5678/webhook/sensor"
 private const val ROOM = "nursery"
 private const val CHILD_AGE = 1
 private const val SEND_EVERY_MS = 60000L
+private const val TILT_TOPPLE_THRESHOLD = 115f
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -533,13 +534,15 @@ fun SensorScreen(modifier: Modifier = Modifier) {
 
     var endpointUrl by remember {
         val saved = prefs.getString("webhook_url", null)
-        mutableStateOf(if (saved.isNullOrBlank() || saved.contains("ftkkl") || saved.contains("dddci") || saved.contains("hbrul") || saved.contains("ewlsx")) DEFAULT_CLOUD_URL else saved)
+        mutableStateOf(if (saved.isNullOrBlank() || saved.contains("pinggy") || !saved.contains("trycloudflare.com")) DEFAULT_CLOUD_URL else saved)
     }
     var emergencyContactNumber by remember {
-        mutableStateOf(prefs.getString("emergency_contact_number", "") ?: "")
+        val num = prefs.getString("emergency_contact_number", null)
+        mutableStateOf(if (num.isNullOrBlank()) "+919670426566" else num)
     }
     var emergencyContactName by remember {
-        mutableStateOf(prefs.getString("emergency_contact_name", "Family / Caregiver") ?: "Family / Caregiver")
+        val name = prefs.getString("emergency_contact_name", null)
+        mutableStateOf(if (name.isNullOrBlank() || name == "Family / Caregiver") "Nishant Ece" else name)
     }
     var isAlarmSilenced by remember { mutableStateOf(false) }
 
@@ -747,7 +750,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
 
     var lastTiltWarning by remember { mutableStateOf(false) }
     LaunchedEffect(tilt) {
-        val isTiltedNow = (tilt ?: 0f) > 75f
+        val isTiltedNow = (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD
         if (isTiltedNow && !lastTiltWarning) {
             if (!ringtone.isPlaying) {
                 triggerWarningAlert(context)
@@ -808,7 +811,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    val isPhysicalWarning = (tilt ?: 0f) > 75f || isChildCry || (cameraActive && isCameraBlocked)
+    val isPhysicalWarning = (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD || isChildCry || (cameraActive && isCameraBlocked)
     val effectiveLevel = when {
         assessment?.level == "high" -> "high"
         isPhysicalWarning || assessment?.level == "medium" -> "medium"
@@ -824,7 +827,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
 
     val effectiveTitle = when {
         assessment?.level == "high" -> assessment?.alertTitle ?: "🚨 CRITICAL HAZARD"
-        (tilt ?: 0f) > 75f -> "⚠️ CAUTION: Stand Toppled (>75°)"
+        (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD -> "⚠️ CAUTION: Stand Toppled (>115°)"
         isChildCry -> "⚠️ CAUTION: Infant Distress Cry"
         cameraActive && isCameraBlocked -> "⚠️ CAUTION: Camera View Obstructed"
         !assessment?.alertTitle.isNullOrBlank() -> assessment?.alertTitle ?: "Nursery Status"
@@ -832,7 +835,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
     }
 
     val effectivePrediction = when {
-        (tilt ?: 0f) > 75f -> "Phone is tilted at %.0f° — nursery stand or cradle has fallen.".format(tilt ?: 0f)
+        (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD -> "Phone is tilted at %.0f° — nursery stand or cradle has fallen.".format(tilt ?: 0f)
         isChildCry -> "Acute acoustic crying pitch (%.0f Hz) detected in nursery.".format(pitchHz)
         cameraActive && isCameraBlocked -> "Camera lens is covered or dark. Line-of-sight to child is lost."
         !assessment?.prediction.isNullOrBlank() -> assessment?.prediction ?: ""
@@ -840,7 +843,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
     }
 
     val effectiveAction = when {
-        (tilt ?: 0f) > 75f -> "Reposition phone on stable stand."
+        (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD -> "Reposition phone on stable upright stand."
         isChildCry -> "Check on infant immediately."
         cameraActive && isCameraBlocked -> "Clear obstruction from camera lens."
         !assessment?.action.isNullOrBlank() -> assessment?.action ?: ""
@@ -923,7 +926,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             }
         }
 
-        val isWarningActive = !isAlarmActive && (assessment?.level == "medium" || (cameraActive && isCameraBlocked) || isChildCry || (tilt ?: 0f) > 75f)
+        val isWarningActive = !isAlarmActive && (assessment?.level == "medium" || (cameraActive && isCameraBlocked) || isChildCry || (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD)
         if (isWarningActive) {
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)),
@@ -943,14 +946,14 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         val warningTitle = when {
                             cameraActive && isCameraBlocked -> "⚠️ CAUTION: Camera View Obstructed"
                             isChildCry -> "⚠️ CAUTION: Infant Distress Cry"
-                            (tilt ?: 0f) > 75f -> "⚠️ CAUTION: Stand Toppled (>75°)"
+                            (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD -> "⚠️ CAUTION: Stand Toppled (>115°)"
                             !assessment?.alertTitle.isNullOrBlank() -> assessment?.alertTitle ?: "⚠️ CAUTION: Nursery Attention"
                             else -> "⚠️ CAUTION: Nursery Attention"
                         }
                         val warningDetail = when {
                             cameraActive && isCameraBlocked -> "Camera lens is covered or dark. Line-of-sight to child is lost."
                             isChildCry -> "Pediatric distress pitch (%.0f Hz) detected.".format(pitchHz)
-                            (tilt ?: 0f) > 75f -> "Device is tilted at %.0f° — reposition stable stand.".format(tilt ?: 0f)
+                            (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD -> "Device is tilted at %.0f° — reposition stable upright stand.".format(tilt ?: 0f)
                             !assessment?.action.isNullOrBlank() -> assessment?.action ?: ""
                             else -> assessment?.prediction ?: "Environmental parameters require caregiver attention."
                         }
@@ -1015,7 +1018,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         val lightLabel = if ((lux ?: 50f) < 5f) "Night" else if ((lux ?: 50f) > 1200f) "Glare!" else "Light"
                         QuickSensorChip(lightIcon, lux?.let { "%.0flx".format(it) } ?: "-", lightLabel, isWarning = (lux ?: 50f) > 1500f)
                         QuickSensorChip("🏃", accel?.let { "%.1f".format(it) } ?: "-", "Motion")
-                        QuickSensorChip("📐", tilt?.let { "%.0f°".format(it) } ?: "-", "Tilt", (tilt ?: 0f) > 75f)
+                        QuickSensorChip("📐", tilt?.let { "%.0f°".format(it) } ?: "-", "Tilt", (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD)
                         QuickSensorChip("🔋", batteryTemp?.let { "%.0f°C".format(it) } ?: "-", "Temp")
                     }
 
@@ -1215,9 +1218,9 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                     SensorDetailCard(
                         title = "Tilt Angle",
                         value = tilt?.let { "%.0f°".format(it) } ?: "No data",
-                        subtext = if ((tilt ?: 0f) > 75f) "⚠️ Device toppled or fallen (>75°)" else "Normal stable stand position (<65° safe)",
+                        subtext = if ((tilt ?: 0f) > TILT_TOPPLE_THRESHOLD) "⚠️ Device toppled or fallen (>115°)" else "Normal upright stand position (<110° safe)",
                         icon = "📐",
-                        isWarning = (tilt ?: 0f) > 75f
+                        isWarning = (tilt ?: 0f) > TILT_TOPPLE_THRESHOLD
                     )
 
                     SensorDetailCard(
