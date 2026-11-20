@@ -636,14 +636,33 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             })
             put("history", JSONArray())
         }
+        if (simulateHazard) {
+            // Immediate zero-latency demo trigger: Instant red alert, siren, and dispatch buttons
+            assessment = Assessment(
+                level = "high",
+                prediction = "CRITICAL: Fast-rising environmental surge with infant acoustic distress (>85 dB).",
+                action = "Trigger emergency siren immediately! Physical parental intervention required.",
+                alarmSound = true,
+                emergencyCallRecommended = true,
+                alertTitle = "🚨 URGENT: DANGER DETECTED",
+                emergencySmsContent = "EMERGENCY: High hazard near child in nursery! Severe crying & fallen device detected. Check immediately!"
+            )
+            isAlarmSilenced = false
+            status = "⚡ Hazard Active (Instant Response)"
+        }
         scope.launch {
-            status = if (simulateHazard) "Simulating hazard spike..." else "Sending to AI crew..."
+            if (!simulateHazard) {
+                status = "Sending to AI crew..."
+            }
             val t0 = System.currentTimeMillis()
             try {
-                assessment = postReading(endpointUrl, body)
-                status = "OK - answered in ${(System.currentTimeMillis() - t0) / 1000} s"
+                val remoteAssessment = postReading(endpointUrl, body)
+                assessment = remoteAssessment
+                status = if (simulateHazard) "OK - AI verified in ${(System.currentTimeMillis() - t0) / 1000} s" else "OK - answered in ${(System.currentTimeMillis() - t0) / 1000} s"
             } catch (e: Exception) {
-                status = "Failed: ${e.javaClass.simpleName}: ${e.message}"
+                if (!simulateHazard) {
+                    status = "Failed: ${e.javaClass.simpleName}: ${e.message}"
+                }
             } finally {
                 busy = false
             }
