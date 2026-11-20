@@ -77,7 +77,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sqrt
 
-private const val DEFAULT_CLOUD_URL = "https://ewlsx-160-187-77-3.free.pinggy.net/webhook/sensor"
+private const val DEFAULT_CLOUD_URL = "https://intro-participating-investment-straight.trycloudflare.com/webhook/sensor"
+private const val BACKUP_CLOUD_URL = "https://uehoc-160-187-77-3.free.pinggy.net/webhook/sensor"
 private const val LOCAL_URL = "http://localhost:5678/webhook/sensor"
 private const val WIFI_LAN_URL = "http://10.63.3.116:5678/webhook/sensor"
 private const val ROOM = "nursery"
@@ -113,10 +114,11 @@ suspend fun postReading(customUrl: String, body: JSONObject): Assessment = withC
         add(LOCAL_URL)
         add(WIFI_LAN_URL)
         val validCustom = customUrl.trim()
-        if (validCustom.isNotBlank() && !validCustom.contains("trycloudflare") && !validCustom.contains("ftkkl") && !validCustom.contains("dddci") && !validCustom.contains("hbrul")) {
+        if (validCustom.isNotBlank() && !validCustom.contains("ftkkl") && !validCustom.contains("dddci") && !validCustom.contains("hbrul") && !validCustom.contains("ewlsx")) {
             add(validCustom)
         }
         add(DEFAULT_CLOUD_URL)
+        add(BACKUP_CLOUD_URL)
     }
     var lastException: Exception? = null
     for (urlString in urls) {
@@ -531,7 +533,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
 
     var endpointUrl by remember {
         val saved = prefs.getString("webhook_url", null)
-        mutableStateOf(if (saved.isNullOrBlank() || saved.contains("trycloudflare") || saved.contains("ftkkl") || saved.contains("dddci") || saved.contains("hbrul")) DEFAULT_CLOUD_URL else saved)
+        mutableStateOf(if (saved.isNullOrBlank() || saved.contains("ftkkl") || saved.contains("dddci") || saved.contains("hbrul") || saved.contains("ewlsx")) DEFAULT_CLOUD_URL else saved)
     }
     var emergencyContactNumber by remember {
         mutableStateOf(prefs.getString("emergency_contact_number", "") ?: "")
