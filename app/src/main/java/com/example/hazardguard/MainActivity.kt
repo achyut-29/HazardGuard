@@ -578,7 +578,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             put("sensors", JSONObject().apply {
                 put("noise_db", if (simulateHazard) 88.0 else (noise ?: 0f).toDouble())
                 put("motion_ms2", if (simulateHazard) 15.0 else (accel ?: 9.81f).toDouble())
-                put("tilt_deg", if (simulateHazard) 60.0 else (tilt ?: 0f).toDouble())
+                put("tilt_deg", if (simulateHazard) 110.0 else (tilt ?: 0f).toDouble())
                 if (simulateHazard) {
                     put("smoke_level", 0.70)
                     put("gas_ppm", 650.0)
@@ -724,7 +724,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         QuickSensorChip("🔊", noise?.let { "%.0fdB".format(it) } ?: "-", "Noise", (noise ?: 0f) > 65f)
                         QuickSensorChip("💡", lux?.let { "%.0flx".format(it) } ?: "-", "Light")
                         QuickSensorChip("🏃", accel?.let { "%.1f".format(it) } ?: "-", "Motion")
-                        QuickSensorChip("📐", tilt?.let { "%.0f°".format(it) } ?: "-", "Tilt", (tilt ?: 0f) > 35f)
+                        QuickSensorChip("📐", tilt?.let { "%.0f°".format(it) } ?: "-", "Tilt", (tilt ?: 0f) > 75f)
                         QuickSensorChip("🔋", batteryTemp?.let { "%.0f°C".format(it) } ?: "-", "Temp")
                     }
 
@@ -885,9 +885,9 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                     SensorDetailCard(
                         title = "Tilt Angle",
                         value = tilt?.let { "%.0f°".format(it) } ?: "No data",
-                        subtext = if ((tilt ?: 0f) > 45f) "⚠️ Device fallen or steeply tilted" else "Level upright position (<15° safe)",
+                        subtext = if ((tilt ?: 0f) > 75f) "⚠️ Device toppled or fallen (>75°)" else "Normal stable stand position (<65° safe)",
                         icon = "📐",
-                        isWarning = (tilt ?: 0f) > 45f
+                        isWarning = (tilt ?: 0f) > 75f
                     )
 
                     SensorDetailCard(
