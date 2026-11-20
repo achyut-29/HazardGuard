@@ -68,7 +68,7 @@ import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.sqrt
 
-private const val DEFAULT_CLOUD_URL = "https://hbrul-160-187-77-3.free.pinggy.net/webhook/sensor"
+private const val DEFAULT_CLOUD_URL = "https://ewlsx-160-187-77-3.free.pinggy.net/webhook/sensor"
 private const val LOCAL_URL = "http://localhost:5678/webhook/sensor"
 private const val ROOM = "nursery"
 private const val CHILD_AGE = 1
@@ -100,9 +100,12 @@ data class Assessment(
 
 suspend fun postReading(customUrl: String, body: JSONObject): Assessment = withContext(Dispatchers.IO) {
     val urls = linkedSetOf<String>().apply {
-        if (customUrl.isNotBlank()) add(customUrl.trim())
-        add(DEFAULT_CLOUD_URL)
         add(LOCAL_URL)
+        val validCustom = customUrl.trim()
+        if (validCustom.isNotBlank() && !validCustom.contains("trycloudflare") && !validCustom.contains("ftkkl") && !validCustom.contains("dddci") && !validCustom.contains("hbrul")) {
+            add(validCustom)
+        }
+        add(DEFAULT_CLOUD_URL)
     }
     var lastException: Exception? = null
     for (urlString in urls) {
@@ -110,7 +113,7 @@ suspend fun postReading(customUrl: String, body: JSONObject): Assessment = withC
         try {
             conn = URL(urlString).openConnection() as HttpURLConnection
             conn.requestMethod = "POST"
-            conn.connectTimeout = 7000
+            conn.connectTimeout = 4000
             conn.readTimeout = 45000
             conn.doOutput = true
             conn.setRequestProperty("Content-Type", "application/json")
@@ -421,7 +424,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
 
     var endpointUrl by remember {
         val saved = prefs.getString("webhook_url", null)
-        mutableStateOf(if (saved.isNullOrBlank() || saved.contains("trycloudflare") || saved.contains("ftkkl") || saved.contains("dddci")) DEFAULT_CLOUD_URL else saved)
+        mutableStateOf(if (saved.isNullOrBlank() || saved.contains("trycloudflare") || saved.contains("ftkkl") || saved.contains("dddci") || saved.contains("hbrul")) DEFAULT_CLOUD_URL else saved)
     }
     var emergencyContactNumber by remember {
         mutableStateOf(prefs.getString("emergency_contact_number", "") ?: "")
