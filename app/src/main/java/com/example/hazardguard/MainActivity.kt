@@ -17,13 +17,18 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
+import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.BatteryManager
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.ContactsContract
 import android.view.Surface
 import android.view.TextureView
@@ -460,6 +465,61 @@ fun Reading(label: String, value: String) {
     }
 }
 
+fun triggerWarningAlert(context: Context) {
+    try {
+        val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+        val r = RingtoneManager.getRingtone(context.applicationContext, uri)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            r?.audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+        }
+        r?.play()
+    } catch (_: Exception) {}
+
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            vibratorManager?.defaultVibrator?.vibrate(
+                VibrationEffect.createOneShot(250, VibrationEffect.DEFAULT_AMPLITUDE)
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                vibrator?.vibrate(
+                    VibrationEffect.createOneShot(250, VibrationEffect.DEFAULT_AMPLITUDE)
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                vibrator?.vibrate(250)
+            }
+        }
+    } catch (_: Exception) {}
+}
+
+fun placeEmergencyCall(context: Context, number: String) {
+    if (number.isBlank()) return
+    try {
+        val hasCallPerm = ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED
+        val intent = if (hasCallPerm) {
+            Intent(Intent.ACTION_CALL, Uri.parse("tel:${number.trim()}"))
+        } else {
+            Intent(Intent.ACTION_DIAL, Uri.parse("tel:${number.trim()}"))
+        }
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        try {
+            val dialIntent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${number.trim()}"))
+            dialIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(dialIntent)
+        } catch (_: Exception) {}
+    }
+}
+
 @Composable
 fun SensorScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -541,8 +601,24 @@ fun SensorScreen(modifier: Modifier = Modifier) {
         ActivityResultContracts.RequestPermission()
     ) { micGranted = it }
 
+    var callPermissionGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) ==
+                    PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val callPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { callPermissionGranted = it }
+
+    var autoCallEnabled by remember {
+        mutableStateOf(prefs.getBoolean("auto_call_enabled", true))
+    }
+    var hasAutoCalled by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         if (!micGranted) launcher.launch(Manifest.permission.RECORD_AUDIO)
+        if (!callPermissionGranted) callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
     }
     LaunchedEffect(micGranted) {
         if (micGranted) measureNoise { db, pitch, cry ->
@@ -552,11 +628,19 @@ fun SensorScreen(modifier: Modifier = Modifier) {
         }
     }
 
+    var lastAlertLevel by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(assessment) {
-        val isHighDanger = assessment?.level == "high" && assessment?.alarmSound == true
+        val currentLevel = assessment?.level?.lowercase()
+        val isHighDanger = currentLevel == "high" && assessment?.alarmSound == true
+        val isWarning = currentLevel == "medium" || currentLevel == "warning"
+
         if (isHighDanger && !isAlarmSilenced) {
             if (!ringtone.isPlaying) {
                 ringtone.play()
+            }
+            if (autoCallEnabled && emergencyContactNumber.isNotBlank() && !hasAutoCalled) {
+                hasAutoCalled = true
+                placeEmergencyCall(context, emergencyContactNumber)
             }
         } else {
             if (ringtone.isPlaying) {
@@ -564,8 +648,45 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             }
             if (!isHighDanger) {
                 isAlarmSilenced = false
+                hasAutoCalled = false
+            }
+            if (isWarning && lastAlertLevel != "medium" && lastAlertLevel != "warning") {
+                triggerWarningAlert(context)
             }
         }
+        lastAlertLevel = currentLevel
+    }
+
+    var lastCameraBlocked by remember { mutableStateOf(false) }
+    LaunchedEffect(cameraActive, isCameraBlocked) {
+        val blockedNow = cameraActive && isCameraBlocked
+        if (blockedNow && !lastCameraBlocked) {
+            if (!ringtone.isPlaying) {
+                triggerWarningAlert(context)
+            }
+        }
+        lastCameraBlocked = blockedNow
+    }
+
+    var lastChildCry by remember { mutableStateOf(false) }
+    LaunchedEffect(isChildCry) {
+        if (isChildCry && !lastChildCry) {
+            if (!ringtone.isPlaying) {
+                triggerWarningAlert(context)
+            }
+        }
+        lastChildCry = isChildCry
+    }
+
+    var lastTiltWarning by remember { mutableStateOf(false) }
+    LaunchedEffect(tilt) {
+        val isTiltedNow = (tilt ?: 0f) > 75f
+        if (isTiltedNow && !lastTiltWarning) {
+            if (!ringtone.isPlaying) {
+                triggerWarningAlert(context)
+            }
+        }
+        lastTiltWarning = isTiltedNow
     }
 
     DisposableEffect(Unit) {
@@ -763,6 +884,51 @@ fun SensorScreen(modifier: Modifier = Modifier) {
             }
         }
 
+        val isWarningActive = !isAlarmActive && (assessment?.level == "medium" || (cameraActive && isCameraBlocked) || isChildCry || (tilt ?: 0f) > 75f)
+        if (isWarningActive) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF9C4)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("⚠️", modifier = Modifier.padding(end = 8.dp), style = MaterialTheme.typography.titleMedium)
+                    Column(modifier = Modifier.weight(1f)) {
+                        val warningTitle = when {
+                            cameraActive && isCameraBlocked -> "CAUTION: Camera Lens Obstructed"
+                            isChildCry -> "CAUTION: Infant Distress Cry Detected"
+                            (tilt ?: 0f) > 75f -> "CAUTION: Stand Toppled (>75°)"
+                            else -> "CAUTION: Nursery Warning (${assessment?.alertTitle.takeIf { !it.isNullOrBlank() } ?: "Elevated Risk"})"
+                        }
+                        val warningDetail = when {
+                            cameraActive && isCameraBlocked -> "Line-of-sight to child is lost. Clear camera obstruction."
+                            isChildCry -> "High-pitch acoustic cry frequency (%.0f Hz) detected.".format(pitchHz)
+                            (tilt ?: 0f) > 75f -> "Device is tilted at %.0f° — reposition stand.".format(tilt ?: 0f)
+                            else -> assessment?.prediction ?: "Environmental parameters require attention."
+                        }
+                        Text(
+                            warningTitle,
+                            color = Color(0xFFE65100),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            warningDetail,
+                            color = Color(0xFF5D4037),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        }
+
         when (selectedTab) {
             0 -> {
                 Column(
@@ -876,8 +1042,7 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         Button(
                             onClick = {
                                 if (emergencyContactNumber.isNotBlank()) {
-                                    val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:${emergencyContactNumber.trim()}"))
-                                    context.startActivity(intent)
+                                    placeEmergencyCall(context, emergencyContactNumber)
                                 }
                             },
                             enabled = emergencyContactNumber.isNotBlank(),
@@ -1084,6 +1249,29 @@ fun SensorScreen(modifier: Modifier = Modifier) {
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("⚡ Auto-Call on Critical Hazard", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            Text("Automatically dial designated contact when danger is confirmed.", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        }
+                        Switch(
+                            checked = autoCallEnabled,
+                            onCheckedChange = {
+                                autoCallEnabled = it
+                                prefs.edit().putBoolean("auto_call_enabled", it).apply()
+                                if (it && !callPermissionGranted) {
+                                    callPermissionLauncher.launch(Manifest.permission.CALL_PHONE)
+                                }
+                            }
+                        )
+                    }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
