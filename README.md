@@ -2,6 +2,11 @@
 
 > **Autonomous Edge-Agent Sentinel & Multi-Modal Perception System for Child Safety**
 
+[![Latest Release](https://img.shields.io/github/v/release/achyut-29/HazardGuard?color=blue&label=Latest%20Release)](https://github.com/achyut-29/HazardGuard/releases/tag/v1.0.0)
+[![Download APK](https://img.shields.io/badge/Download-HazardGuard%20v1.0.0.apk-success?logo=android)](https://github.com/achyut-29/HazardGuard/releases/download/v1.0.0/HazardGuard-v1.0.0.apk)
+
+📥 **[Download Pre-Compiled Android APK (v1.0.0)](https://github.com/achyut-29/HazardGuard/releases/download/v1.0.0/HazardGuard-v1.0.0.apk)**
+
 HazardGuard is an intelligent edge-agent and multi-modal perception system designed to run on resource-constrained mobile hardware (calibrated on Motorola Edge 40 Neo). It continuously monitors micro-environmental safety, detects infant physical and acoustic distress, executes autonomous local reflexes, and interfaces with a cloud-based 6-agent deliberative reasoning hierarchy.
 
 ---
